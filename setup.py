@@ -21,10 +21,11 @@ class CMakeBuild(build_ext):
             f"-DPYTHON_EXECUTABLE={sys.executable}",
             "-DCMAKE_BUILD_TYPE=Release",
             "-DCMAKE_CUDA_ARCHITECTURES=80",
+            "-DCMAKE_VERBOSE_MAKEFILE=ON",
         ]
 
         # Build configuration
-        build_args = ["--config", "Release"]
+        build_args = ["--config", "Release", "--verbose"]
 
         # Parallel build
         if hasattr(self, "parallel") and self.parallel:
