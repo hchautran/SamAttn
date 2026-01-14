@@ -12,7 +12,7 @@ find_package(CUDAToolkit REQUIRED)
 
 # CUDA architectures - modify based on your GPU
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-  set(CMAKE_CUDA_ARCHITECTURES 80 86 89 90)  # Ampere, Ada, Hopper
+  set(CMAKE_CUDA_ARCHITECTURES 80)  # SM 8.0 (Ampere)
 endif()
 
 # Find or fetch CUTLASS
@@ -20,6 +20,15 @@ find_package(CUTLASS QUIET)
 if(NOT CUTLASS_FOUND)
   message(STATUS "CUTLASS not found, fetching from GitHub...")
   include(FetchContent)
+
+  # Disable CUTLASS library and tools - we only need headers
+  set(CUTLASS_ENABLE_LIBRARY OFF CACHE BOOL "Enable CUTLASS Library" FORCE)
+  set(CUTLASS_ENABLE_TOOLS OFF CACHE BOOL "Enable CUTLASS Tools" FORCE)
+  set(CUTLASS_ENABLE_PROFILER OFF CACHE BOOL "Enable CUTLASS Profiler" FORCE)
+  set(CUTLASS_ENABLE_TESTS OFF CACHE BOOL "Enable CUTLASS Tests" FORCE)
+  set(CUTLASS_ENABLE_EXAMPLES OFF CACHE BOOL "Enable CUTLASS Examples" FORCE)
+  set(CUTLASS_NVCC_ARCHS "80" CACHE STRING "CUTLASS NVCC architectures" FORCE)
+
   FetchContent_Declare(
     cutlass
     GIT_REPOSITORY https://github.com/NVIDIA/cutlass.git
