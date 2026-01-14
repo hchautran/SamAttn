@@ -17,83 +17,81 @@ __global__ void gemm_cute_kernel(
 ) {
     using namespace cute;
 
-    // Thread and block indices
-    int tid = threadIdx.x;
+    // Block indices
     int bx = blockIdx.x;
     int by = blockIdx.y;
+    int tid = threadIdx.x;
 
-    // Global memory tensors
-    auto gA = make_tensor(make_gmem_ptr(A), make_shape(M, K), make_stride(K, 1));
-    auto gB = make_tensor(make_gmem_ptr(B), make_shape(K, N), make_stride(N, 1));
-    auto gC = make_tensor(make_gmem_ptr(C), make_shape(M, N), make_stride(N, 1));
-
-    // Tile the global tensors
-    auto tileA = local_tile(gA, make_shape(Int<kTileM>{}, Int<kTileK>{}), make_coord(by, _));
-    auto tileB = local_tile(gB, make_shape(Int<kTileK>{}, Int<kTileN>{}), make_coord(_, bx));
-    auto tileC = local_tile(gC, make_shape(Int<kTileM>{}, Int<kTileN>{}), make_coord(by, bx));
+    // Compute block offsets
+    int block_m = by * kTileM;
+    int block_n = bx * kTileN;
 
     // Shared memory for tiles
     __shared__ Element sA[kTileM * kTileK];
     __shared__ Element sB[kTileK * kTileN];
 
-    auto smemA = make_tensor(make_smem_ptr(sA), make_shape(Int<kTileM>{}, Int<kTileK>{}));
-    auto smemB = make_tensor(make_smem_ptr(sB), make_shape(Int<kTileK>{}, Int<kTileN>{}));
-
-    // Accumulator
+    // Register accumulator
     Element acc = Element(0);
+
+    // Compute thread's output position within tile
+    int thread_m = tid / kTileN;
+    int thread_n = tid % kTileN;
 
     // Number of K tiles
     int num_k_tiles = (K + kTileK - 1) / kTileK;
 
     // Loop over K dimension
     for (int k_tile = 0; k_tile < num_k_tiles; ++k_tile) {
-        // Load A tile to shared memory
-        auto gA_slice = tileA(_, k_tile);
+        int block_k = k_tile * kTileK;
+
+        // Cooperatively load A tile [kTileM, kTileK] into shared memory
         for (int i = tid; i < kTileM * kTileK; i += blockDim.x) {
             int m = i / kTileK;
             int k = i % kTileK;
-            if (by * kTileM + m < M && k_tile * kTileK + k < K) {
-                smemA(m, k) = gA_slice(m, k);
+            int gm = block_m + m;
+            int gk = block_k + k;
+
+            if (gm < M && gk < K) {
+                sA[m * kTileK + k] = A[gm * K + gk];
             } else {
-                smemA(m, k) = Element(0);
+                sA[m * kTileK + k] = Element(0);
             }
         }
 
-        // Load B tile to shared memory
-        auto gB_slice = tileB(k_tile, _);
+        // Cooperatively load B tile [kTileK, kTileN] into shared memory
         for (int i = tid; i < kTileK * kTileN; i += blockDim.x) {
             int k = i / kTileN;
             int n = i % kTileN;
-            if (k_tile * kTileK + k < K && bx * kTileN + n < N) {
-                smemB(k, n) = gB_slice(k, n);
+            int gk = block_k + k;
+            int gn = block_n + n;
+
+            if (gk < K && gn < N) {
+                sB[k * kTileN + n] = B[gk * N + gn];
             } else {
-                smemB(k, n) = Element(0);
+                sB[k * kTileN + n] = Element(0);
             }
         }
 
         __syncthreads();
 
-        // Compute tile
-        int m = tid / kTileN;
-        int n = tid % kTileN;
-
-        if (m < kTileM && n < kTileN) {
+        // Compute partial dot product for this thread
+        if (thread_m < kTileM && thread_n < kTileN) {
             for (int k = 0; k < kTileK; ++k) {
-                acc += smemA(m, k) * smemB(k, n);
+                acc += sA[thread_m * kTileK + k] * sB[k * kTileN + thread_n];
             }
         }
 
         __syncthreads();
     }
 
-    // Write result
-    int m = tid / kTileN;
-    int n = tid % kTileN;
-    int gm = by * kTileM + m;
-    int gn = bx * kTileN + n;
+    // Write result to global memory
+    if (thread_m < kTileM && thread_n < kTileN) {
+        int gm = block_m + thread_m;
+        int gn = block_n + thread_n;
 
-    if (gm < M && gn < N && m < kTileM && n < kTileN) {
-        tileC(m, n) = acc;
+        if (gm < M && gn < N) {
+            C[gm * N + gn] = acc;
+        }
     }
 }
 
