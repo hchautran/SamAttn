@@ -1,0 +1,47 @@
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.so
+*.o
+*.a
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# CUDA
+*.i
+*.ii
+*.gpu
+*.ptx
+*.cubin
+*.fatbin
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CUTLASS (if downloaded locally)
+_deps/
+cutlass/
+
+# Benchmarks output
+*.log
+*.out

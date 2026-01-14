@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=49.0", "wheel", "torch", "ninja"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "samattn"
+version = "0.1.0"
+description = "Custom GEMM and Flash Attention kernels using CUTLASS CUTE"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "torch>=2.0.0",
+    "numpy",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "triton>=2.0.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["samattn*"]
+
+[tool.setuptools.package-data]
+samattn = ["*.so"]
